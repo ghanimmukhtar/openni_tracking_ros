@@ -42,6 +42,7 @@
 #include <pcl_ros/transforms.h>
 #include <pcl/common/io.h>
 #include <chrono>
+#include <pcl_tracking/ObjectCloud.h>
 
 #define PCL_NO_PRECOMPILE
 #define PCL_TRACKING_NORMAL_SUPPORTED
@@ -570,6 +571,7 @@ class OpenNISegmentTracking
                 else if (counter_ == nb_wait_iter_)
                     {
                         //gridSample (cloud_pass_, *cloud_pass_downsampled_, 0.07);
+                        filterPassThrough(ref_cloud_dict[0], *cloud_pass_);
                         cloud_pass_downsampled_ = cloud_pass_;
                         CloudPtr target_cloud;
                         if (use_convex_hull_)
@@ -695,11 +697,37 @@ class OpenNISegmentTracking
 
                 ros::Rate my_rate(20);
 
-                while(!start_publishing_reference_cloud_){
-                        ROS_ERROR("In First While loop");
-                        ros::spinOnce();
-                        my_rate.sleep();
+                std::vector< sensor_msgs::PointCloud2 > obj_cloud_vector;
+                ros::ServiceClient client = _nh.serviceClient <pcl_tracking::ObjectCloud> ("/visual/get_object_model_vector");
+                pcl_tracking::ObjectCloud srv;
+
+                if (client.call(srv))
+                    {
+                        obj_cloud_vector = srv.response.cloud_vector;
+                        //nb_objects = obj_cloud_vector.size();
+
+                        //int counter_2 = 0;
+                        //for (int obj_id=0; obj_id < nb_objects; obj_id++){
+                        // From PointCloud2 to PCL point cloud
+                        pcl::PointCloud<RefPointType>::Ptr input_cloud_pcl(new pcl::PointCloud<PointType>);
+                        pcl::fromROSMsg(obj_cloud_vector[0], *input_cloud_pcl);
+
+                        //ROS_ERROR_STREAM("TEST : " << counter_2 << counter_2 << counter_2 << counter_2 << counter_2);
+
+                        ref_cloud_dict[0] = input_cloud_pcl;
+                        //counter_2++;
+                        //  }
                     }
+                else
+                    {
+                        //ROS_ERROR("Failed to call service get_object_model");
+                        return ;
+                    }
+                //                while(!start_publishing_reference_cloud_){
+                //                        ROS_ERROR("In First While loop");
+                //                        ros::spinOnce();
+                //                        my_rate.sleep();
+                //                    }
 
                 //ros::spin();
                 //while (!viewer_->wasStopped() && ros::ok()){
@@ -707,10 +735,10 @@ class OpenNISegmentTracking
                         ROS_ERROR("In Second While loop");
                         viewer_.spinOnce(100);
                         ros::spinOnce();
-                        if(start_publishing_reference_cloud_){
+                        /*if(start_publishing_reference_cloud_){
                                 _reference_cloud_msgs->header.stamp = ros::Time::now();
                                 _reference_cloud_pub.publish(*_reference_cloud_msgs);
-                            }
+                            }*/
                         my_rate.sleep();
                     }
             }
@@ -722,6 +750,7 @@ class OpenNISegmentTracking
         pcl::PointCloud<pcl::PointXYZRGB> test_1_;
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr vis_cloud_;
         unsigned nb_wait_iter_ = 10;
+        std::map<int, CloudPtr> ref_cloud_dict; // object clouds to track
 
         //original variables
         pcl::visualization::PCLVisualizer viewer_;

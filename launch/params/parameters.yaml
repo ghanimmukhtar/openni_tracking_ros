@@ -1,0 +1,6 @@
+camera_type: "kinect_1"
+full_path: "/home/ghanim/git/openni_tracking_ros/models/"
+path_original_pcd: "/home/ghanim/git/openni_tracking_ros/src/"
+path_filtered_pcd: "/home/ghanim/git/openni_tracking_ros/src/"
+segm_limits: {x: {min: 0.45, max: 1.1}, y: {min: -0.6, max: 0.6}, z: {min: -0.1, max: 0.2}} ## normal table
+#segm_limits: {x: {min: 0.5, max: 0.9}, y: {min: -0.25, max: 0.25}, z: {min: 0.02, max: 0.6}} ## red high table

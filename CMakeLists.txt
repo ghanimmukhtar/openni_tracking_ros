@@ -39,6 +39,9 @@ include_directories(
 add_executable (testyy src/testyy.cpp)
 target_link_libraries (testyy ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
+add_executable (create_model src/create_model.cpp)
+target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 add_executable (tracking_sample src/tracking_sample.cpp)
 target_link_libraries (tracking_sample ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
