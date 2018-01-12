@@ -143,7 +143,7 @@ class OpenNISegmentTracking
         OpenNISegmentTracking (int thread_nr, double downsampling_grid_size,
                                bool use_convex_hull,
                                bool visualize_non_downsample, bool visualize_particles,
-                               bool use_fixed, bool print_time)
+                               bool use_fixed)
             : viewer_ ("PCL OpenNI Tracking Viewer")
             , new_cloud_ (false)
             , ne_ (thread_nr)
@@ -151,7 +151,6 @@ class OpenNISegmentTracking
             , use_convex_hull_ (use_convex_hull)
             , visualize_non_downsample_ (visualize_non_downsample)
             , visualize_particles_ (visualize_particles)
-            , print_time_ (print_time)
             , downsampling_grid_size_ (downsampling_grid_size)
             {
                 KdTreePtr tree (new KdTree (false));
@@ -233,7 +232,6 @@ class OpenNISegmentTracking
                                 for (size_t i = 0; i < particles->points.size (); i++)
                                     {
                                         pcl::PointXYZ point;
-
                                         point.x = particles->points[i].x;
                                         point.y = particles->points[i].y;
                                         point.z = particles->points[i].z;
@@ -277,107 +275,39 @@ class OpenNISegmentTracking
 
             }
 
-        /*        void copy_pcl_clouds(CloudPtr& source, pcl::PointCloud<PointType_2>::Ptr& destination){
-
-                ROS_WARN_STREAM("Source cloud size is : " << source->points.size());
-                destination->points.resize(source->size());
-                for(size_t i = 0; i < source->points.size(); i++){
-                        destination->points[i].x = source->points[i].x;
-                        destination->points[i].y = source->points[i].y;
-                        destination->points[i].z = source->points[i].z;
-                    }
-            }*/
-
-        boost::shared_ptr<pcl::visualization::PCLVisualizer> normalsVis (
-                pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud, pcl::PointCloud<pcl::Normal>::ConstPtr normals)
-            {
-                // --------------------------------------------------------
-                // -----Open 3D viewer and add point cloud and normals-----
-                // --------------------------------------------------------
-                boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-                viewer->setBackgroundColor (0, 0, 0);
-                pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloud);
-                viewer->addPointCloud<pcl::PointXYZRGB> (cloud, rgb, "sample cloud");
-                viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
-                viewer->addPointCloudNormals<pcl::PointXYZRGB, pcl::Normal> (cloud, normals, 10, 0.05, "normals");
-
-                viewer->addCoordinateSystem (1.0);
-                viewer->initCameraParameters ();
-                return (viewer);
-            }
-
         void
         viz_cb (pcl::visualization::PCLVisualizer& viz)
             {
-                //boost::mutex::scoped_lock lock (mtx_);
-                std::chrono::time_point<std::chrono::high_resolution_clock> viz_init;
-                if (print_time_)
-                    viz_init = std::chrono::high_resolution_clock::now();
-
-                std::chrono::time_point<std::chrono::high_resolution_clock> viz_setup;
-                if (print_time_)
-                    viz_setup = std::chrono::high_resolution_clock::now();
-                PCL_INFO("VIZ_CB 00000000000 ......\n");
                 viz.setBackgroundColor(0, 0, 0);
                 viz.setCameraClipDistances(0.00884782, 8);
                 viz.setCameraPosition( 0.0926632, 0.158074, -0.955283, 0.0926631, 0.158074, -0.955282, 0.0229289, -0.994791, -0.0993251);
                 viz.setCameraFieldOfView(0.7);
                 viz.setSize(960, 716);
                 viz.setPosition(250, 52);
-
-                if (!cloud_pass_ || !cloud_pass_downsampled_)
+                if (!cloud_pass_ )
                     {
                         boost::this_thread::sleep (boost::posix_time::seconds (1));
                         return;
                     }
-
-                PCL_INFO("VIZ_CB 1111111111111 ......\n");
-                //ROS_WARN_STREAM("Downsampled cloud size : " << cloud_pass_downsampled_->points.size());
-                //ROS_WARN_STREAM("New cloud size : " << new_cloud_->points.size());
                 if (new_cloud_ && cloud_pass_downsampled_)
                     {
-                        PCL_INFO("VIZ_CB 222222222222 ......\n");
                         //CloudPtr cloud_pass;
                         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_pass;
-
-                        //const pcl::PointCloud<pcl::PointXYZRGBNormal> test_2_ = *cloud_pass_;
-                        //pcl::copyPointCloud(test_2_, test_1_);
-
                         if (!visualize_non_downsample_){
                                 const pcl::PointCloud<pcl::PointXYZRGBNormal> test_2_ = *cloud_pass_downsampled_;
                                 pcl::copyPointCloud(test_2_, test_1_);
-                                //pcl::PointCloud<pcl::PointXYZRGB> test_3 = test_1_;
-                                //ROS_INFO_STREAM("Size of test_1_ after pcl copycloud 11111111111 : " << test_3.size());
-                                //cloud_pass = cloud_pass_downsampled_;
-                                //pcl::copyPointCloud(*cloud_pass_downsampled_, *cloud_pass);
-                                //copy_pcl_clouds(cloud_pass_downsampled_, cloud_pass);
                             }
                         else{
                                 const pcl::PointCloud<pcl::PointXYZRGBNormal> test_2_ = *cloud_pass_;
                                 pcl::copyPointCloud(test_2_, test_1_);
-                                //pcl::PointCloud<pcl::PointXYZRGB> test_3 = test_1_;
-                                //ROS_INFO_STREAM("Size of test_1_ after pcl copycloud 2222222222222 : " << test_3.size());
-                                //cloud_pass = cloud_pass_;
-                                //pcl::copyPointCloud(*cloud_pass_, *cloud_pass);
-                                //copy_pcl_clouds(cloud_pass_, cloud_pass);
                             }
-
-
-                        //cloud_pass.reset(&test_1_);
-                        //pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_pass(&test_1_);
                         cloud_pass = test_1_.makeShared();
 
-                        //vis_cloud_.reset(&test_1_);
-
-                        //convert cloud_pass from point type pcl::pclpointxyzrgbnormal to just pcl::pclxyzrgba !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         if (!viz.updatePointCloud (cloud_pass, "cloudpass"))
-                        //if (!viz.updatePointCloud (vis_cloud_, "cloudpass"))
                             {
                                 viz.addPointCloud (cloud_pass, "cloudpass");
-                                //viz.addPointCloud (vis_cloud_, "cloudpass");
                                 viz.resetCameraViewpoint ("cloudpass");
                             }
-                        PCL_INFO("VIZ_CB 33333333333 ......\n");
                     }
 
                 if (new_cloud_ && reference_)
@@ -422,8 +352,8 @@ class OpenNISegmentTracking
                 FPS_CALC_BEGIN;
                 pcl::PassThrough<PointType> pass;
                 pass.setFilterFieldName ("z");
-                //pass.setFilterLimits (0.0, 10.0);
-                pass.setFilterLimits (0.0, 1.5);
+                pass.setFilterLimits (0.0, 10.0);
+                //pass.setFilterLimits (0.0, 1.5);
                 //pass.setFilterLimits (0.0, 0.6);
                 pass.setKeepOrganized (false);
                 pass.setInputCloud (cloud);
@@ -621,10 +551,10 @@ class OpenNISegmentTracking
                 double start = pcl::getTime ();
                 FPS_CALC_BEGIN;
                 //convert pointcloud2 topic into pcl::pointcloud
-                pcl::PCLPointCloud2 pcl_pc2;
-                pcl_conversions::toPCL(*cloud_topic, pcl_pc2);
                 CloudPtr cloud (new Cloud);
-                pcl::fromPCLPointCloud2(pcl_pc2, *cloud);
+                ROS_INFO("Hello!!!!!");
+                pcl::fromROSMsg(*cloud_topic, *cloud);
+                ROS_INFO("Byee!!!");
 
                 //the original code
                 cloud_pass_.reset (new Cloud);
@@ -632,14 +562,14 @@ class OpenNISegmentTracking
                 pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
                 pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
                 filterPassThrough (cloud, *cloud_pass_);
-                ROS_ERROR_STREAM("The count is : " << counter_);
-                if (counter_ < 10)
+                ROS_ERROR_STREAM("The Counter is : " << counter_);
+                if (counter_ < nb_wait_iter_)
                     {
                         gridSample (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
                     }
-                else if (counter_ == 10)
+                else if (counter_ == nb_wait_iter_)
                     {
-                        //gridSample (cloud_pass_, *cloud_pass_downsampled_, 0.01);
+                        //gridSample (cloud_pass_, *cloud_pass_downsampled_, 0.07);
                         cloud_pass_downsampled_ = cloud_pass_;
                         CloudPtr target_cloud;
                         if (use_convex_hull_)
@@ -721,24 +651,14 @@ class OpenNISegmentTracking
                                         pcl::toROSMsg(*transed_ref_downsampled, *_reference_cloud_msgs);
                                         _reference_cloud_msgs->header.frame_id = "base";
                                         start_publishing_reference_cloud_ = true;
-
-
-                                        //pcl::copyPointCloud()
-                                        //const pcl::PointCloud<pcl::PointXYZRGBNormal> test_2_ = *segmented_cloud_;
-                                        //PCL_INFO("I am here 44444444444 ......\n");
-                                        //pcl::copyPointCloud(test_2_, test_1_);
-                                        //ROS_INFO_STREAM("I am here 555555555555 ...... the size of cloud test_1 is : " << test_1_.size());
-                                        //vis_cloud_.reset(&test_1_);
-                                        //PCL_INFO("I am here 666666666666 ......\n");
-                                        //viewer_ = normalsVis(vis_cloud_, normals);
-                                        //PCL_INFO("I am here 7777777777 ......\n");
+                                        _reference_cloud_msgs->header.stamp = ros::Time::now();
+                                        _reference_cloud_pub.publish(*_reference_cloud_msgs);
+                                        ROS_WARN_STREAM("JUST Published Reference pointcloud2 with size : " << _reference_cloud_msgs->data.size());
 
                                         tracker_->setReferenceCloud (transed_ref_downsampled);
                                         tracker_->setTrans (trans);
                                         reference_ = transed_ref;
                                         tracker_->setMinIndices (int (ref_cloud->points.size ()) / 2);
-                                        //viz_cb(viewer_);
-                                        PCL_INFO("I am here ************** ......\n");
                                     }
                                 else
                                     {
@@ -748,11 +668,7 @@ class OpenNISegmentTracking
                     }
                 else
                     {
-                        //cloud_pass_downsampled_ = cloud_pass_;
-                        //*cloud_pass_downsampled_ = *cloud_pass_;
-                        //cloud_pass_downsampled_ = cloud_pass_;
                         gridSampleApprox (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
-                        ROS_ERROR_STREAM("Downsampled Cloud Size : " << cloud_pass_downsampled_->size());
                         normals_.reset (new pcl::PointCloud<pcl::Normal>);
                         normalEstimation (cloud_pass_downsampled_, *normals_);
                         RefCloudPtr tracking_cloud (new RefCloud ());
@@ -778,26 +694,24 @@ class OpenNISegmentTracking
                 _reference_cloud_msgs.reset(new sensor_msgs::PointCloud2);
 
                 ros::Rate my_rate(20);
-                //viewer_.registerPointPickingCallback();
-                //viewer_.runOnVisualizationThread (boost::bind(&OpenNISegmentTracking::viz_cb, this, _1), "viz_cb");
-                //viewer_.
-                //                while(!start_publishing_reference_cloud_){
-                //                        ros::spinOnce();
-                //                        my_rate.sleep();
-                //                    }
+
+                while(!start_publishing_reference_cloud_){
+                        ROS_ERROR("In First While loop");
+                        ros::spinOnce();
+                        my_rate.sleep();
+                    }
 
                 //ros::spin();
                 //while (!viewer_->wasStopped() && ros::ok()){
                 while (ros::ok()){
-                        viewer_.spinOnce(100, true);
-                        boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+                        ROS_ERROR("In Second While loop");
+                        viewer_.spinOnce(100);
                         ros::spinOnce();
-                        /*if(start_publishing_reference_cloud_){
+                        if(start_publishing_reference_cloud_){
                                 _reference_cloud_msgs->header.stamp = ros::Time::now();
                                 _reference_cloud_pub.publish(*_reference_cloud_msgs);
-                            }*/
+                            }
                         my_rate.sleep();
-                        //boost::this_thread::sleep(boost::posix_time::milliseconds(100));
                     }
             }
 
@@ -807,11 +721,10 @@ class OpenNISegmentTracking
         ros::Publisher _reference_cloud_pub;
         pcl::PointCloud<pcl::PointXYZRGB> test_1_;
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr vis_cloud_;
-        bool print_time_;
+        unsigned nb_wait_iter_ = 10;
 
         //original variables
         pcl::visualization::PCLVisualizer viewer_;
-        //boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer_;
         pcl::PointCloud<pcl::Normal>::Ptr normals_;
         CloudPtr cloud_pass_;
         CloudPtr cloud_pass_downsampled_;
@@ -823,7 +736,6 @@ class OpenNISegmentTracking
         std::vector<pcl::Vertices> hull_vertices_;
         sensor_msgs::PointCloud2Ptr _reference_cloud_msgs;
 
-        //std::string device_id_;
         boost::mutex mtx_;
         bool new_cloud_;
         pcl::NormalEstimationOMP<PointType, pcl::Normal> ne_; // to store threadpool
@@ -847,7 +759,6 @@ main (int argc, char** argv)
         bool visualize_non_downsample = false;
         bool visualize_particles = true;
         bool use_fixed = false;
-        bool print_time = false;
 
         double downsampling_grid_size = 0.01;
 
@@ -855,10 +766,10 @@ main (int argc, char** argv)
         //OpenNISegmentTracking<pcl::PointXYZRGBA> v (8, downsampling_grid_size,
         //                                          use_convex_hull,
         //                                        visualize_non_downsample, visualize_particles,
-        //                                      use_fixed, print_time);
+        //                                      use_fixed);
         OpenNISegmentTracking<pcl::PointXYZRGBNormal> v (8, downsampling_grid_size,
                                                          use_convex_hull,
                                                          visualize_non_downsample, visualize_particles,
-                                                         use_fixed, print_time);
+                                                         use_fixed);
         v.run (argc, argv);
     }
