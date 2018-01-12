@@ -225,6 +225,7 @@ class OpenNISegmentTracking
         drawParticles (pcl::visualization::PCLVisualizer& viz)
             {
                 ParticleFilter::PointCloudStatePtr particles = tracker_->getParticles ();
+                //ROS_WARN_STREAM("PARTICLES SIZE IS : " << particles->size());
                 if (particles)
                     {
                         if (visualize_particles_)
@@ -262,18 +263,19 @@ class OpenNISegmentTracking
                 // move a little bit for better visualization
                 transformation.translation () += Eigen::Vector3f (0.0f, 0.0f, -0.005f);
                 RefCloudPtr result_cloud (new RefCloud ());
+                int obj_id = 0;
 
                 if (!visualize_non_downsample_)
                     pcl::transformPointCloud<RefPointType> (*(tracker_->getReferenceCloud ()), *result_cloud, transformation);
                 else
-                    pcl::transformPointCloud<RefPointType> (*reference_, *result_cloud, transformation);
+                    pcl::transformPointCloud<RefPointType> (*reference_dict[obj_id], *result_cloud, transformation);
 
                 {
                     pcl::visualization::PointCloudColorHandlerCustom<RefPointType> red_color (result_cloud, 0, 0, 255);
                     if (!viz.updatePointCloud (result_cloud, red_color, "resultcloud"))
                         viz.addPointCloud (result_cloud, red_color, "resultcloud");
                 }
-
+                ROS_WARN_STREAM("RESULT PARTICLES SIZE IS : " << result.data);
             }
 
         void
@@ -311,7 +313,7 @@ class OpenNISegmentTracking
                             }
                     }
 
-                if (new_cloud_ && reference_)
+                if (new_cloud_ && (reference_dict.size() > 0))
                     {
                         bool ret = drawParticles (viz);
                         if (ret)
@@ -467,6 +469,7 @@ class OpenNISegmentTracking
                 double end = pcl::getTime ();
                 FPS_CALC_END("tracking");
                 tracking_time_ = end - start;
+                ROS_INFO_STREAM("TRACKING TIME IS : " << tracking_time_);
             }
 
         void addNormalToCloud (const CloudConstPtr &cloud,
@@ -570,103 +573,34 @@ class OpenNISegmentTracking
                     }
                 else if (counter_ == nb_wait_iter_)
                     {
-                        //gridSample (cloud_pass_, *cloud_pass_downsampled_, 0.07);
-                        filterPassThrough(ref_cloud_dict[0], *cloud_pass_);
-                        cloud_pass_downsampled_ = cloud_pass_;
-                        CloudPtr target_cloud;
-                        if (use_convex_hull_)
-                            {
-                                planeSegmentation (cloud_pass_downsampled_, *coefficients, *inliers);
-                                if (inliers->indices.size () > 3)
-                                    {
-                                        CloudPtr cloud_projected (new Cloud);
-                                        cloud_hull_.reset (new Cloud);
-                                        nonplane_cloud_.reset (new Cloud);
+                        int obj_id = 0;
+                        //boost::shared_ptr<ParticleFilter> tracker_;
+                        CloudPtr ref_cloud;
+                        //for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
+                                //obj_id = tracker_pair.first;
+                                //tracker_ = tracker_pair.second;
+                                ref_cloud = ref_cloud_dict[obj_id];
 
-                                        planeProjection (cloud_pass_downsampled_, *cloud_projected, coefficients);
-                                        convexHull (cloud_projected, *cloud_hull_, hull_vertices_);
+                                //std::cerr << "ref_cloud: " << ref_cloud->width * ref_cloud->height << " data points." << std::endl;
 
-                                        extractNonPlanePoints (cloud_pass_downsampled_, cloud_hull_, *nonplane_cloud_);
-                                        target_cloud = nonplane_cloud_;
-                                    }
-                                else
-                                    {
-                                        PCL_WARN ("cannot segment plane\n");
-                                    }
-                            }
-                        else
-                            {
-                                PCL_WARN ("without plane segmentation\n");
-                                target_cloud = cloud_pass_downsampled_;
-                            }
+                                RefCloudPtr nonzero_ref (new RefCloud);
+                                removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
+                                PCL_INFO ("calculating cog\n"); // center of gravity
+                                Eigen::Vector4f c;
+                                RefCloudPtr transed_ref (new RefCloud);
+                                pcl::compute3DCentroid<RefPointType> (*nonzero_ref, c); // obj init pos : centroid
+                                Eigen::Affine3f trans = Eigen::Affine3f::Identity ();
+                                trans.translation ().matrix () = Eigen::Vector3f (c[0], c[1], c[2]);
+                                pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
+                                //pcl::transformPointCloud<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse()); // store it into trans
 
-                        if (target_cloud != NULL)
-                            {
-                                PCL_INFO ("segmentation, please wait...\n");
-                                std::vector<pcl::PointIndices> cluster_indices;
-                                euclideanSegment (target_cloud, cluster_indices);
-                                if (cluster_indices.size () > 0)
-                                    {
-                                        // select the cluster to track
-                                        CloudPtr temp_cloud (new Cloud);
-                                        extractSegmentCluster (target_cloud, cluster_indices, 0, *temp_cloud);
-                                        Eigen::Vector4f c;
-                                        pcl::compute3DCentroid<RefPointType> (*temp_cloud, c);
-                                        int segment_index = 0;
-                                        double segment_distance = c[0] * c[0] + c[1] * c[1];
-                                        for (size_t i = 1; i < cluster_indices.size (); i++)
-                                            {
-                                                temp_cloud.reset (new Cloud);
-                                                extractSegmentCluster (target_cloud, cluster_indices, int (i), *temp_cloud);
-                                                pcl::compute3DCentroid<RefPointType> (*temp_cloud, c);
-                                                double distance = c[0] * c[0] + c[1] * c[1];
-                                                if (distance < segment_distance)
-                                                    {
-                                                        segment_index = int (i);
-                                                        segment_distance = distance;
-                                                    }
-                                            }
-
-                                        segmented_cloud_.reset (new Cloud);
-                                        extractSegmentCluster (target_cloud, cluster_indices, segment_index, *segmented_cloud_);
-                                        pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
-                                        normalEstimation (segmented_cloud_, *normals);
-                                        RefCloudPtr ref_cloud (new RefCloud);
-                                        addNormalToCloud (segmented_cloud_, normals, *ref_cloud);
-                                        ref_cloud = segmented_cloud_;
-                                        RefCloudPtr nonzero_ref (new RefCloud);
-                                        removeZeroPoints (ref_cloud, *nonzero_ref);
-
-                                        PCL_INFO ("calculating cog\n");
-
-                                        RefCloudPtr transed_ref (new RefCloud);
-                                        pcl::compute3DCentroid<RefPointType> (*nonzero_ref, c);
-                                        Eigen::Affine3f trans = Eigen::Affine3f::Identity ();
-                                        trans.translation ().matrix () = Eigen::Vector3f (c[0], c[1], c[2]);
-                                        pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
-                                        //pcl::transformPointCloud<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse());
-                                        CloudPtr transed_ref_downsampled (new Cloud);
-                                        gridSample (transed_ref, *transed_ref_downsampled, downsampling_grid_size_);
-
-                                        //lets see how the reference cloud looks like try to visualise it ...................................
-                                        //convert pcl::pointcloud into pointcloud2 topic
-                                        pcl::toROSMsg(*transed_ref_downsampled, *_reference_cloud_msgs);
-                                        _reference_cloud_msgs->header.frame_id = "base";
-                                        start_publishing_reference_cloud_ = true;
-                                        _reference_cloud_msgs->header.stamp = ros::Time::now();
-                                        _reference_cloud_pub.publish(*_reference_cloud_msgs);
-                                        ROS_WARN_STREAM("JUST Published Reference pointcloud2 with size : " << _reference_cloud_msgs->data.size());
-
-                                        tracker_->setReferenceCloud (transed_ref_downsampled);
-                                        tracker_->setTrans (trans);
-                                        reference_ = transed_ref;
-                                        tracker_->setMinIndices (int (ref_cloud->points.size ()) / 2);
-                                    }
-                                else
-                                    {
-                                        PCL_WARN ("euclidean segmentation failed\n");
-                                    }
-                            }
+                                CloudPtr transed_ref_downsampled (new Cloud);
+                                gridSample (transed_ref, *transed_ref_downsampled, downsampling_grid_size_);
+                                tracker_->setReferenceCloud (transed_ref_downsampled); // TRACK THIS CLOUD !!
+                                tracker_->setTrans (trans);
+                                reference_dict[obj_id] = transed_ref;
+                                tracker_->setMinIndices (int (ref_cloud->points.size ()) / 2); // SET INDICES TO TRACK
+                          //  }
                     }
                 else
                     {
@@ -703,31 +637,17 @@ class OpenNISegmentTracking
 
                 if (client.call(srv))
                     {
+                        int obj_id = 0;
                         obj_cloud_vector = srv.response.cloud_vector;
-                        //nb_objects = obj_cloud_vector.size();
-
-                        //int counter_2 = 0;
-                        //for (int obj_id=0; obj_id < nb_objects; obj_id++){
-                        // From PointCloud2 to PCL point cloud
                         pcl::PointCloud<RefPointType>::Ptr input_cloud_pcl(new pcl::PointCloud<PointType>);
-                        pcl::fromROSMsg(obj_cloud_vector[0], *input_cloud_pcl);
-
-                        //ROS_ERROR_STREAM("TEST : " << counter_2 << counter_2 << counter_2 << counter_2 << counter_2);
-
-                        ref_cloud_dict[0] = input_cloud_pcl;
-                        //counter_2++;
-                        //  }
+                        pcl::fromROSMsg(obj_cloud_vector[obj_id], *input_cloud_pcl);
+                        ref_cloud_dict[obj_id] = input_cloud_pcl;
                     }
                 else
                     {
-                        //ROS_ERROR("Failed to call service get_object_model");
+                        ROS_ERROR("Failed to call service get_object_model");
                         return ;
                     }
-                //                while(!start_publishing_reference_cloud_){
-                //                        ROS_ERROR("In First While loop");
-                //                        ros::spinOnce();
-                //                        my_rate.sleep();
-                //                    }
 
                 //ros::spin();
                 //while (!viewer_->wasStopped() && ros::ok()){
@@ -735,10 +655,6 @@ class OpenNISegmentTracking
                         ROS_ERROR("In Second While loop");
                         viewer_.spinOnce(100);
                         ros::spinOnce();
-                        /*if(start_publishing_reference_cloud_){
-                                _reference_cloud_msgs->header.stamp = ros::Time::now();
-                                _reference_cloud_pub.publish(*_reference_cloud_msgs);
-                            }*/
                         my_rate.sleep();
                     }
             }
@@ -749,8 +665,9 @@ class OpenNISegmentTracking
         ros::Publisher _reference_cloud_pub;
         pcl::PointCloud<pcl::PointXYZRGB> test_1_;
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr vis_cloud_;
-        unsigned nb_wait_iter_ = 10;
+        unsigned nb_wait_iter_ = 2;
         std::map<int, CloudPtr> ref_cloud_dict; // object clouds to track
+        std::map<int, CloudPtr> reference_dict;
 
         //original variables
         pcl::visualization::PCLVisualizer viewer_;

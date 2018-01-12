@@ -43,8 +43,8 @@ class object_model_creater {
         object_model_creater(ros::NodeHandle nh) : _nh(nh){
                 init();
             }
-        void init(){
 
+        void init(){
                 try {
                     _nh.getParam("/", _parameters);
                     _camera_type = static_cast<string>(_parameters["camera_type"]);
@@ -88,15 +88,11 @@ class object_model_creater {
         void process_cloud(){
                 ROS_ERROR("TEST 11111");
                 _service_response.clear();
-
                 // Write the original version to disk
                 pcl::PCDWriter writer;
-
                 // Create folder to store the generated model clouds
                 const boost::posix_time::ptime time = boost::posix_time::second_clock::universal_time();
-
                 std::string str_time = boost::posix_time::to_simple_string(time);
-
                 std::string full_path = static_cast<string>(_parameters["full_path"]) + str_time;
                 boost::filesystem::path dir(full_path);
                 if(!boost::filesystem::create_directory(dir)){
@@ -113,11 +109,9 @@ class object_model_creater {
                 if(strcmp(_camera_type.c_str(), "kinect_1") == 0)
                     out_frame = "camera_depth_optical_frame";
 
-
                 tf2_ros::Buffer tfBuffer;
                 tf2_ros::TransformListener listener(tfBuffer);
                 geometry_msgs::TransformStamped transformStamped;
-
                 // Transform PointCloud2 from kinect frame to base frame
                 try{
                     ros::Time now = ros::Time(0);
@@ -125,7 +119,6 @@ class object_model_creater {
                                                                 out_frame,
                                                                 ros::Time(0),
                                                                 ros::Duration(10.0));
-                    // std::cout << transformStamped << std::endl;
                     tf2::doTransform(_saved_cloud, input_tf, transformStamped);
                 }
                 catch(tf2::TransformException& ex){
@@ -133,10 +126,7 @@ class object_model_creater {
                     }
 
                 // From PointCloud2 to PCL point cloud
-                //pcl::PCLPointCloud2 pcl_pc2;
-                //pcl_conversions::toPCL(input_tf,pcl_pc2);
                 pcl::PointCloud<PointType>::Ptr input_tf_pcl(new pcl::PointCloud<PointType>);
-                //pcl::fromPCLPointCloud2(pcl_pc2,*input_tf_pcl);
                 pcl::fromROSMsg(input_tf, *input_tf_pcl);
                 pcl::PointCloud<PointType>::Ptr input_tf_pcl_non_zero (new pcl::PointCloud<PointType>);
                 removeZeroPoints(input_tf_pcl, input_tf_pcl_non_zero);
@@ -192,7 +182,6 @@ class object_model_creater {
                 ec.extract (cluster_indices);
 
                 ///// Transform back the reference frame
-
                 // From PCL point cloud to PointCloud2
                 sensor_msgs::PointCloud2 tmp_cloud_ros, tmp_cloud_ros_tf;
                 pcl::toROSMsg(*cloud_filteredX, tmp_cloud_ros);
@@ -213,13 +202,8 @@ class object_model_creater {
 
                 // From PointCloud2 to PCL point cloud
                 pcl::PointCloud<PointType>::Ptr tmp_cloud_pcl_tf(new pcl::PointCloud<PointType>);
-                //pcl_conversions::toPCL(tmp_cloud_ros_tf,pcl_pc2);
-                //pcl::fromPCLPointCloud2(pcl_pc2,*tmp_cloud_pcl_tf);
-
                 pcl::fromROSMsg(tmp_cloud_ros_tf, *tmp_cloud_pcl_tf);
-
                 std::cerr << "Number of clusters: " << cluster_indices.size() << std::endl;
-
                 //        pcl::PCDWriter writer;
                 int j = 0;
                 for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
@@ -231,10 +215,6 @@ class object_model_creater {
                         cloud_cluster->height = 1;
                         cloud_cluster->is_dense = true;
 
-//                        pcl::NormalEstimationOMP<PointType, PointType> nest;
-//                        nest.setRadiusSearch(0.01);
-//                        nest.setInputCloud(cloud_cluster);
-//                        nest.compute(*cloud_cluster);
                         // Write model files
                         std::stringstream ss;
                         ss << full_path << "/" << j << ".pcd";
@@ -248,7 +228,6 @@ class object_model_creater {
                         j++;
                     }
             }
-
 
         bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
                               pcl_tracking::ObjectCloud::Response& res){
@@ -265,15 +244,11 @@ class object_model_creater {
 
         void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
                 _saved_cloud = *input;
-
-
             }
-
 
         void spin(){
                 ros::spinOnce();
             }
-
 
     private:
         ros::NodeHandle _nh;
@@ -285,7 +260,6 @@ class object_model_creater {
         vector<sensor_msgs::PointCloud2> _service_response;
         string _camera_type;
     };
-
 
 int
 main (int argc, char** argv)
@@ -302,5 +276,4 @@ main (int argc, char** argv)
 
             }
         ros::spin ();
-
     }
