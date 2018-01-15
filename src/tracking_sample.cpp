@@ -213,6 +213,11 @@ class OpenNISegmentTracking
                 color_coherence->setWeight (0.1);
                 coherence->addPointCoherence (color_coherence);
 
+//                boost::shared_ptr<NormalCoherence<RefPointType> > normal_coherence
+//                        = boost::shared_ptr<NormalCoherence<RefPointType> > (new NormalCoherence<RefPointType> ());
+//                normal_coherence->setWeight(1.0);
+//                coherence->addPointCoherence(normal_coherence);
+
                 //boost::shared_ptr<pcl::search::KdTree<RefPointType> > search (new pcl::search::KdTree<RefPointType> (false));
                 boost::shared_ptr<pcl::search::Octree<RefPointType> > search (new pcl::search::Octree<RefPointType> (0.01));
                 //boost::shared_ptr<pcl::search::OrganizedNeighbor<RefPointType> > search (new pcl::search::OrganizedNeighbor<RefPointType>);
@@ -221,8 +226,7 @@ class OpenNISegmentTracking
                 tracker_->setCloudCoherence (coherence);
             }
 
-        bool
-        drawParticles (pcl::visualization::PCLVisualizer& viz)
+        bool drawParticles (pcl::visualization::PCLVisualizer& viz)
             {
                 ParticleFilter::PointCloudStatePtr particles = tracker_->getParticles ();
                 //ROS_WARN_STREAM("PARTICLES SIZE IS : " << particles->size());
@@ -255,8 +259,7 @@ class OpenNISegmentTracking
                     }
             }
 
-        void
-        drawResult (pcl::visualization::PCLVisualizer& viz)
+        void drawResult (pcl::visualization::PCLVisualizer& viz)
             {
                 ParticleXYZRPY result = tracker_->getResult ();
                 Eigen::Affine3f transformation = tracker_->toEigenMatrix (result);
@@ -278,8 +281,7 @@ class OpenNISegmentTracking
                 ROS_WARN_STREAM("RESULT PARTICLES SIZE IS : " << result.data);
             }
 
-        void
-        viz_cb (pcl::visualization::PCLVisualizer& viz)
+        void viz_cb (pcl::visualization::PCLVisualizer& viz)
             {
                 viz.setBackgroundColor(0, 0, 0);
                 viz.setCameraClipDistances(0.00884782, 8);
@@ -577,30 +579,30 @@ class OpenNISegmentTracking
                         //boost::shared_ptr<ParticleFilter> tracker_;
                         CloudPtr ref_cloud;
                         //for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
-                                //obj_id = tracker_pair.first;
-                                //tracker_ = tracker_pair.second;
-                                ref_cloud = ref_cloud_dict[obj_id];
+                        //obj_id = tracker_pair.first;
+                        //tracker_ = tracker_pair.second;
+                        ref_cloud = ref_cloud_dict[obj_id];
 
-                                //std::cerr << "ref_cloud: " << ref_cloud->width * ref_cloud->height << " data points." << std::endl;
+                        //std::cerr << "ref_cloud: " << ref_cloud->width * ref_cloud->height << " data points." << std::endl;
 
-                                RefCloudPtr nonzero_ref (new RefCloud);
-                                removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
-                                PCL_INFO ("calculating cog\n"); // center of gravity
-                                Eigen::Vector4f c;
-                                RefCloudPtr transed_ref (new RefCloud);
-                                pcl::compute3DCentroid<RefPointType> (*nonzero_ref, c); // obj init pos : centroid
-                                Eigen::Affine3f trans = Eigen::Affine3f::Identity ();
-                                trans.translation ().matrix () = Eigen::Vector3f (c[0], c[1], c[2]);
-                                pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
-                                //pcl::transformPointCloud<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse()); // store it into trans
+                        RefCloudPtr nonzero_ref (new RefCloud);
+                        removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
+                        PCL_INFO ("calculating cog\n"); // center of gravity
+                        Eigen::Vector4f c;
+                        RefCloudPtr transed_ref (new RefCloud);
+                        pcl::compute3DCentroid<RefPointType> (*nonzero_ref, c); // obj init pos : centroid
+                        Eigen::Affine3f trans = Eigen::Affine3f::Identity ();
+                        trans.translation ().matrix () = Eigen::Vector3f (c[0], c[1], c[2]);
+                        pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
+                        //pcl::transformPointCloud<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse()); // store it into trans
 
-                                CloudPtr transed_ref_downsampled (new Cloud);
-                                gridSample (transed_ref, *transed_ref_downsampled, downsampling_grid_size_);
-                                tracker_->setReferenceCloud (transed_ref_downsampled); // TRACK THIS CLOUD !!
-                                tracker_->setTrans (trans);
-                                reference_dict[obj_id] = transed_ref;
-                                tracker_->setMinIndices (int (ref_cloud->points.size ()) / 2); // SET INDICES TO TRACK
-                          //  }
+                        CloudPtr transed_ref_downsampled (new Cloud);
+                        gridSample (transed_ref, *transed_ref_downsampled, downsampling_grid_size_);
+                        tracker_->setReferenceCloud (transed_ref_downsampled); // TRACK THIS CLOUD !!
+                        tracker_->setTrans (trans);
+                        reference_dict[obj_id] = transed_ref;
+                        tracker_->setMinIndices (int (ref_cloud->points.size ()) / 2); // SET INDICES TO TRACK
+                        //  }
                     }
                 else
                     {
@@ -610,7 +612,8 @@ class OpenNISegmentTracking
                         RefCloudPtr tracking_cloud (new RefCloud ());
                         addNormalToCloud (cloud_pass_downsampled_, normals_, *tracking_cloud);
                         tracking_cloud = cloud_pass_downsampled_;
-                        tracking (cloud_pass_downsampled_);
+                        //tracking (cloud_pass_downsampled_);
+                        tracking(tracking_cloud);
                     }
                 new_cloud_ = true;
                 double end = pcl::getTime ();
@@ -664,6 +667,7 @@ class OpenNISegmentTracking
         ros::Subscriber _cloud_sub;
         ros::Publisher _reference_cloud_pub;
         pcl::PointCloud<pcl::PointXYZRGB> test_1_;
+        //pcl::PointCloud<pcl::PointXYZRGBA> test_1_;
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr vis_cloud_;
         unsigned nb_wait_iter_ = 2;
         std::map<int, CloudPtr> ref_cloud_dict; // object clouds to track
@@ -705,17 +709,17 @@ main (int argc, char** argv)
         bool visualize_non_downsample = false;
         bool visualize_particles = true;
         bool use_fixed = false;
-
-        double downsampling_grid_size = 0.01;
+        double downsampling_grid_size = 0.02;
 
         // the tracker
-        //OpenNISegmentTracking<pcl::PointXYZRGBA> v (8, downsampling_grid_size,
-        //                                          use_convex_hull,
-        //                                        visualize_non_downsample, visualize_particles,
-        //                                      use_fixed);
+        //        OpenNISegmentTracking<pcl::PointXYZRGBA> v (8, downsampling_grid_size,
+        //                                                    use_convex_hull,
+        //                                                    visualize_non_downsample, visualize_particles,
+        //                                                    use_fixed);
+
         OpenNISegmentTracking<pcl::PointXYZRGBNormal> v (8, downsampling_grid_size,
                                                          use_convex_hull,
                                                          visualize_non_downsample, visualize_particles,
                                                          use_fixed);
-        v.run (argc, argv);
+        v.run(argc, argv);
     }

@@ -13,6 +13,7 @@
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/conversions.h>
 #include <pcl_ros/transforms.h>
+#include <pcl/common/time.h>
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
@@ -35,6 +36,9 @@
 
 using namespace std;
 typedef pcl::PointXYZRGBNormal PointType;
+ typedef pcl::PointCloud<PointType> Cloud;
+typedef typename Cloud::Ptr CloudPtr;
+typedef typename Cloud::ConstPtr CloudConstPtr;
 //typedef pcl::PointNormal PointType;
 string output_filename;
 
@@ -45,6 +49,9 @@ class object_model_creater {
             }
 
         void init(){
+                //pcl::Normal test;
+                //test.getNormalVector4fMap();
+                //test.data_n
                 try {
                     _nh.getParam("/", _parameters);
                     _camera_type = static_cast<string>(_parameters["camera_type"]);
@@ -63,6 +70,21 @@ class object_model_creater {
                 } catch (int e) {
                         ROS_ERROR("An exception occurred during the initialization");
                     }
+            }
+
+        void gridSample (const CloudConstPtr &cloud, Cloud &result, double leaf_size = 0.01)
+            {
+                //FPS_CALC_BEGIN;
+                double start = pcl::getTime ();
+                pcl::VoxelGrid<PointType> grid;
+                //pcl::ApproximateVoxelGrid<PointType> grid;
+                grid.setLeafSize (float (leaf_size), float (leaf_size), float (leaf_size));
+                grid.setInputCloud (cloud);
+                grid.filter (result);
+                //result = *cloud;
+                double end = pcl::getTime ();
+                downsampling_time_ = end - start;
+                //FPS_CALC_END("gridSample");
             }
 
         void removeZeroPoints (const pcl::PointCloud<PointType>::Ptr &cloud,
@@ -125,11 +147,15 @@ class object_model_creater {
                         ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
                     }
 
-                // From PointCloud2 to PCL point cloud
-                pcl::PointCloud<PointType>::Ptr input_tf_pcl(new pcl::PointCloud<PointType>);
+                // From PointCloud2 to PCL point cloud, remove zeros and gridSample it
+                CloudPtr input_tf_pcl(new Cloud);
                 pcl::fromROSMsg(input_tf, *input_tf_pcl);
-                pcl::PointCloud<PointType>::Ptr input_tf_pcl_non_zero (new pcl::PointCloud<PointType>);
-                removeZeroPoints(input_tf_pcl, input_tf_pcl_non_zero);
+                CloudPtr input_tf_pcl_non_zero (new Cloud);
+                CloudPtr before_downsampled_cloud (new Cloud);
+                removeZeroPoints(input_tf_pcl, before_downsampled_cloud);
+                gridSample(before_downsampled_cloud, *input_tf_pcl_non_zero, 0.02);
+
+
 
                 std::cerr << "PointCloud before filtering: " << input_tf_pcl_non_zero->width * input_tf_pcl_non_zero->height << " data points." << std::endl;
 
@@ -175,7 +201,7 @@ class object_model_creater {
                 std::vector<pcl::PointIndices> cluster_indices;
                 pcl::EuclideanClusterExtraction<PointType> ec;
                 ec.setClusterTolerance (0.02); // 2cm
-                ec.setMinClusterSize (500);
+                ec.setMinClusterSize (100);
                 ec.setMaxClusterSize (25000);
                 ec.setSearchMethod (tree);
                 ec.setInputCloud (cloud_filteredX);
@@ -259,6 +285,7 @@ class object_model_creater {
         sensor_msgs::PointCloud2 _saved_cloud;
         vector<sensor_msgs::PointCloud2> _service_response;
         string _camera_type;
+        double downsampling_time_;
     };
 
 int

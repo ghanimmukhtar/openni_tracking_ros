@@ -1,4 +1,4 @@
 <launch> 
-	<node name="tracking_sample_node" pkg="openni_tracking_ros" type="tracking_sample" output="screen" launch-prefix="terminator -x gdb --args"/> 
-  	<!-- <node name="tracking_sample_node" pkg="openni_tracking_ros" type="tracking_sample" output="screen"/> --> 
+	<!-- <node name="tracking_sample_node" pkg="openni_tracking_ros" type="tracking_sample" output="screen" launch-prefix="terminator -x gdb -r-args"/> --> 
+  	<node name="tracking_sample_node" pkg="openni_tracking_ros" type="tracking_sample" output="screen"/> 
 </launch>
