@@ -213,10 +213,10 @@ class OpenNISegmentTracking
                 color_coherence->setWeight (0.1);
                 coherence->addPointCoherence (color_coherence);
 
-//                boost::shared_ptr<NormalCoherence<RefPointType> > normal_coherence
-//                        = boost::shared_ptr<NormalCoherence<RefPointType> > (new NormalCoherence<RefPointType> ());
-//                normal_coherence->setWeight(1.0);
-//                coherence->addPointCoherence(normal_coherence);
+                boost::shared_ptr<NormalCoherence<RefPointType> > normal_coherence
+                        = boost::shared_ptr<NormalCoherence<RefPointType> > (new NormalCoherence<RefPointType> ());
+                normal_coherence->setWeight(1.0);
+                coherence->addPointCoherence(normal_coherence);
 
                 //boost::shared_ptr<pcl::search::KdTree<RefPointType> > search (new pcl::search::KdTree<RefPointType> (false));
                 boost::shared_ptr<pcl::search::Octree<RefPointType> > search (new pcl::search::Octree<RefPointType> (0.01));
@@ -586,14 +586,22 @@ class OpenNISegmentTracking
                         //std::cerr << "ref_cloud: " << ref_cloud->width * ref_cloud->height << " data points." << std::endl;
 
                         RefCloudPtr nonzero_ref (new RefCloud);
-                        removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
+                        RefCloudPtr temp_cloud(new RefCloud);
+
+                        //removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
+                        removeZeroPoints (ref_cloud, *temp_cloud); // OBJECT TO TRACK !!!!
+                        pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+                        normalEstimation(temp_cloud, *normals);
+                        addNormalToCloud(temp_cloud, normals, *nonzero_ref);
+
                         PCL_INFO ("calculating cog\n"); // center of gravity
                         Eigen::Vector4f c;
                         RefCloudPtr transed_ref (new RefCloud);
                         pcl::compute3DCentroid<RefPointType> (*nonzero_ref, c); // obj init pos : centroid
                         Eigen::Affine3f trans = Eigen::Affine3f::Identity ();
                         trans.translation ().matrix () = Eigen::Vector3f (c[0], c[1], c[2]);
-                        pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
+                        //pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
+                        pcl::transformPointCloudWithNormals<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse());
                         //pcl::transformPointCloud<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse()); // store it into trans
 
                         CloudPtr transed_ref_downsampled (new Cloud);
@@ -611,7 +619,7 @@ class OpenNISegmentTracking
                         normalEstimation (cloud_pass_downsampled_, *normals_);
                         RefCloudPtr tracking_cloud (new RefCloud ());
                         addNormalToCloud (cloud_pass_downsampled_, normals_, *tracking_cloud);
-                        tracking_cloud = cloud_pass_downsampled_;
+                        //tracking_cloud = cloud_pass_downsampled_;
                         //tracking (cloud_pass_downsampled_);
                         tracking(tracking_cloud);
                     }
@@ -709,7 +717,7 @@ main (int argc, char** argv)
         bool visualize_non_downsample = false;
         bool visualize_particles = true;
         bool use_fixed = false;
-        double downsampling_grid_size = 0.02;
+        double downsampling_grid_size = 0.05;
 
         // the tracker
         //        OpenNISegmentTracking<pcl::PointXYZRGBA> v (8, downsampling_grid_size,
