@@ -36,7 +36,8 @@
 
 using namespace std;
 typedef pcl::PointXYZRGBNormal PointType;
- typedef pcl::PointCloud<PointType> Cloud;
+//typedef pcl::PointXYZRGBA PointType;
+typedef pcl::PointCloud<PointType> Cloud;
 typedef typename Cloud::Ptr CloudPtr;
 typedef typename Cloud::ConstPtr CloudConstPtr;
 //typedef pcl::PointNormal PointType;
@@ -257,6 +258,7 @@ class object_model_creater {
 
         bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
                               pcl_tracking::ObjectCloud::Response& res){
+                _service_response.clear();
                 process_cloud();
                 if(_service_response.empty()){
                         ROS_WARN("Objects clouds vector is EMPTY, wait or put object in camera FOV");
